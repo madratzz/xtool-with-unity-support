@@ -26,8 +26,11 @@ struct LaunchCommand: AsyncParsableCommand {
 
     func run() async throws {
         let client = try await connectionOptions.client()
+        try Self.launch(bundleID: bundleID, arguments: args, device: client.device)
+    }
 
-        let installProxy = try InstallationProxyClient(device: client.device, label: "xtool-inst")
+    static func launch(bundleID: String, arguments args: [String], device: Device) throws {
+        let installProxy = try InstallationProxyClient(device: device, label: "xtool-inst")
         let executable: URL
         do {
             executable = try installProxy.executable(forBundleID: bundleID)
@@ -39,18 +42,18 @@ struct LaunchCommand: AsyncParsableCommand {
 
         // iOS 17 moved debugserver behind the CoreDevice tunnel, so launch through
         // the CoreDevice app service there instead
-        let version = try? LockdownClient(device: client.device, label: "xtool", performHandshake: true)
+        let version = try? LockdownClient(device: device, label: "xtool", performHandshake: true)
             .value(ofType: String.self, forDomain: nil, key: "ProductVersion")
         let major = version?.split(separator: ".").first.flatMap { Int($0) }
         if let major, major >= 17 {
-            let pid = try CoreDeviceLauncher(device: client.device).launch(bundleID: bundleID, arguments: args)
+            let pid = try CoreDeviceLauncher(device: device).launch(bundleID: bundleID, arguments: args)
             if let pid { d.out.print("Launched (pid \(pid))") }
             return
         }
 
         let debugserver: DebugserverClient
         do {
-            debugserver = try DebugserverClient(device: client.device, label: "xtool")
+            debugserver = try DebugserverClient(device: device, label: "xtool")
         } catch {
             guard let version else { throw error }
             throw Console.Error("""
