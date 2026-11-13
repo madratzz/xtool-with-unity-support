@@ -21,7 +21,15 @@ extension ProvisioningIdentifiers {
         return identifier.split(separator: ".").dropFirst().joined(separator: ".")
     }
 
+    // Local patch: XTOOL_KEEP_BUNDLE_ID=1 registers the app's own bundle id and
+    // app groups instead of XTL-<team>.<id>, so an install updates an app that
+    // was signed under the real id (keeping its data container).
+    static var keepBundleID: Bool {
+        ProcessInfo.processInfo.environment["XTOOL_KEEP_BUNDLE_ID"] == "1"
+    }
+
     static func identifier(fromSanitized sanitized: String, context: SigningContext) -> String {
+        if keepBundleID { return sanitized }
         let uuid = context.auth.identityID.split(separator: "-")[0].uppercased()
         return "\(Self.idPrefix)\(uuid).\(sanitized)"
     }
